@@ -1,0 +1,162 @@
+---
+title: "examples for GwR chapter 2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Here's some of the code from [Chapter 2: Geographic data in R](https://geocompr.robinlovelace.net/spatial-class.html), for you to follow along with as we go through it in class.
+
+## Prerequisites
+
+To speed things up, we'll only install the binary versions of the packages:
+
+```{r binary-packages-only}
+##options(pkgType = "binary")
+##options(install.packages.check.source = "no")
+```
+
+These packages are already installed on `taylor`, so you only need to install them on your own computer:
+
+
+These packages contain sample datasets, and need to be installed wherever you're working:
+
+```{r data_packages}
+##install.packages("spData")
+##install.packages("spDataLarge",
+            ##     repos = "https://nowosad.r-universe.dev")
+```
+
+Load the packages:
+
+```{r libraries}
+library(sf)
+library(terra)
+library(spData)
+library(spDataLarge)
+```
+
+## Vector data
+
+`sf` documentation:
+
+```{r sf-vignettes}
+vignette(package = "sf")
+vignette("sf1")   
+```
+
+`world` dataset (from [spData](https://nowosad.github.io/spData/) package)
+
+```{r world}
+world
+```
+
+`sf` replaces the base `plot` function with one that understands simple features. The default output is a *faceted* plot: one facet per attribute, plotted on the same geometry:
+
+```{r world-plot}
+plot(world)
+```
+
+Simple features are just data frames with geometry columns.
+
+Generic data frame functions always retain the geometry column:
+
+```{r world-summary}
+summary(world["lifeExp"])
+```
+
+The contents of the geometry column are opaque:
+
+```{r world-geometry-tibble}
+world["geom"]
+```
+
+But you can convert them individually to "well-known text" (WKT) format. (Note the use of [[ ]], since we want a single value, not a list or a tibble.)
+
+```{r world-geometry-wkt}
+st_as_text(world[[1,"geom"]])
+```
+
+`plot` is useful for quickly exploring the results of spatial operations.
+
+```{r world-pop}
+plot(world["pop"])
+```
+
+Extract the countries in Asia from the `world` dataset:
+
+```{r world-asia}
+world_asia = world[world[["continent"]] == "Asia", ]
+plot(world_asia["pop"])
+```
+
+Merge all of the countries in Asia into a single geometry:
+
+```{r asia}
+asia = st_union(world_asia)
+plot(asia)
+```
+
+Of course, when you do that, you lose all of the attributes of the individual countries:
+
+```{r world-asia-attributes}
+names(world_asia)
+```
+
+```{r asia-attributes}
+names(asia)
+```
+
+Layer the Asia outline on top of a map of world population:
+
+```{r asia-on-world-pop}
+plot(world["pop"], reset = FALSE)
+plot(asia, add = TRUE, col = "red")
+# instead of col, try border and lwd
+```
+
+Add symbols to a map.
+
+(Why is this map lame?)
+
+```{r population-symbols}
+world_centroids = st_centroid(world, of_largest_polygon = TRUE)
+symbol_size = sqrt(world[["pop"]]) / 10000
+
+plot(world["continent"], reset = FALSE)
+plot(st_geometry(world_centroids), add = TRUE, cex = symbol_size)
+```
+
+Geometry types:
+
+![](https://geocompr.robinlovelace.net/02-spatial-data_files/figure-html/sfcs-1.png) ![](https://geocompr.robinlovelace.net/02-spatial-data_files/figure-html/multis-1.png) 
+
+Assembling a geometry (polygon example)
+
+```{r polygon-point}
+c(1,5)
+```
+
+```{r polygon-matrix}
+rbind(c(1, 5), c(2, 2), c(4, 1), c(4, 4), c(1, 5))
+```
+
+```{r polygon-list}
+list(rbind(c(1, 5), c(2, 2), c(4, 1), c(4, 4), c(1, 5)))
+```
+
+```{r polygon}
+polygon = st_polygon(list(rbind(c(1, 5), c(2, 2), c(4, 1), c(4, 4), c(1, 5))))
+polygon
+```
+
+```{r}
+plot(polygon)
+```
+
+```{r polygon-text}
+st_as_text(st_polygon(list(rbind(c(1, 5), c(2, 2), c(4, 1), c(4, 4), c(1, 5)))))
+```
+
