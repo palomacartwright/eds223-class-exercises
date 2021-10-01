@@ -15,9 +15,6 @@ library(raster)
 library(dplyr)
 library(spData)
 library(spDataLarge)
-```
-
-```{r}
 library(tmap)    # for static and interactive maps
 library(leaflet) # for interactive maps
 library(ggplot2) # tidyverse data visualization package
@@ -26,6 +23,7 @@ library(ggplot2) # tidyverse data visualization package
 ## 8.2.1 tmap basics
 
 ```{r}
+plot(nz)
 nz
 ```
 
@@ -40,6 +38,9 @@ tm_shape(nz) +
 tm_shape(nz) +
   tm_fill() +
   tm_borders() 
+
+tm_shape(nz) +
+  tm_polygons()
 ```
 
 ```{r}
