@@ -1,0 +1,205 @@
+## Introduction
+
+This is a sample R solution to "Assignment 2 - Sea Level rise in Santa Barbara", as presented in Spring 2021.
+
+The R solution was originally prepared by Bren PhD student [Linus Blomqvist](https://bren.ucsb.edu/people/linus-blomqvist), who took 263 on the condition that he could do the work in R...
+
+This version of the solution has been tweaked and instructionalized by Frew (so if it breaks, don't blame Linus.)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages, include = FALSE}
+library(tidyverse)
+library(sf)
+library(units)
+library(tmap)
+```
+
+## Loading and exploring data
+
+Download and uznip [`data_hw2.zip`](https://frew.eri.ucsb.edu/private/EDS223/data_hw2.zip).
+
+What layers are in `basemap.gpkg`?
+
+```{r}
+st_layers("data_hw2/basemap.gpkg")
+```
+
+> Note: Except for the `ROI` layer, the layers in `basemap.gpkg` are of historical interest only, for use in GIS/programming environments that don't already provide decent base maps.
+
+Read them in:
+
+```{r read_data}
+california <- read_sf("data_hw2/basemap.gpkg", layer = "California")
+cities     <- read_sf("data_hw2/basemap.gpkg", layer = "Cities")
+county     <- read_sf("data_hw2/basemap.gpkg", layer = "County")
+ROI        <- read_sf("data_hw2/basemap.gpkg", layer = "ROI")
+streets    <- read_sf("data_hw2/basemap.gpkg", layer = "streets")
+```
+
+What are the attributes of the `california` layer?
+
+```{r}
+names(california)
+```
+
+What does the `california` layer look like?
+
+```{r map_CA}
+tm_shape(st_geometry(california)) +
+  tm_polygons()
+```
+
+Looks like county polygons. (Sure took a while to plot---any ideas why?)
+
+Check out the `ROI` layer. We'll use `"view"` mode to display it on a live base map, so we have some local detail to orient ourselves with:
+
+```{r map_ROI, message = FALSE}
+tmap_mode("view")
+tm_shape(ROI) +
+  tm_borders()
+```
+
+What layers are in `parcels.gpkg`?
+
+```{r}
+st_layers("data_hw2/parcels.gpkg")
+```
+
+There's only one, so you don't need to specify it when you read it in:
+
+```{r read_parcels}
+parcels <- read_sf("data_hw2/parcels.gpkg")
+```
+
+We're interested in the `NET_AV` attribute. Let's plot it:
+
+```{r hist, message = FALSE, warning = FALSE}
+ggplot(parcels) +
+  geom_histogram(aes(x = NET_AV)) +
+  xlab("Net assessed value")
+```
+
+Yikes, there are a lot more small values than large ones. Let's look at the log of `NET_AV` instead:
+
+```{r hist_log10, message = FALSE, warning = FALSE}
+ggplot(parcels) +
+  geom_histogram(aes(x = NET_AV)) +
+  scale_x_log10() +
+  xlab("Net assessed value")
+```
+
+Looks like most parcels are valued at just under a million dollars, but some are worth tens of millions of dollars.
+
+For the inundation scenarios, combine all the layers into a single `sf` object.
+
+```{r read2}
+# Get layer names
+#
+inund_layers <- st_layers("data_hw2/inundation_scenarios.gpkg")$name
+
+# Start with one layer and then row bind the others onto it with a loop
+#
+scenarios <- read_sf("data_hw2/inundation_scenarios.gpkg", layer = inund_layers[1])
+
+for(i in 2:length(inund_layers)) {
+  scenarios <- rbind(scenarios,
+                     read_sf("data_hw2/inundation_scenarios.gpkg", layer = inund_layers[i]))
+}
+```
+
+Let's look at one of these scenarios:
+
+```{r map_scenarios}
+tm_shape(filter(scenarios, GRIDCODE == 10)) +
+  tm_fill(col = "lightblue") +
+  tm_shape(ROI) +
+  tm_borders()
+```
+
+Looks like this represents current land area that would be inundated under the scenario in question.
+
+## Spatial join
+
+Find the total value of all parcels that fall within the inundated area for each scenario.
+
+```{r spatial_join}
+
+# we calculate the area of each parcel,
+# just in case the existing Shape_Area attribute hasn't been kept up-to-date
+#
+parcels$area <- st_area(parcels)
+
+# convert calculated areas (which will be in CRS units) to hectares
+#
+units(parcels$area) <- make_units(ha)
+
+# join the scenarios to the the parcels
+# and calculate total assessed value, total area, and number of parcels
+# inundated by each SLR scenario
+#
+scenarios <- scenarios %>%
+  st_join(parcels, join = st_intersects) %>%
+  group_by(GRIDCODE) %>%
+  summarize(parcel_count = n(),
+            net_value = round(sum(NET_AV)/1e6, 0),
+            area = round(sum(area), 0))
+```
+
+## Results: table
+
+Clean up `scenarios`:
+
+```{r}
+# rename GRIDCODE column
+#
+names(scenarios)[1] <- "scenario"
+
+# display as table, without geometry
+#
+st_drop_geometry(scenarios)
+```
+
+Optional: extra-bitchin formatting:
+
+```{r}
+library(kableExtra)
+st_drop_geometry(scenarios) %>%
+  kbl(col.names = c("Sea-level rise (m)",
+                    "Parcel count", 
+                    "Net loss ($m)", 
+                    "Area flooded (ha)")) %>%
+  kable_material(c("striped", "hover"))
+```
+
+## Results: map
+
+In the map, the numbers 1 through 10 represent the number of meters of sea-level rise associated with each scenario and the intensity of the color represents the amount of property value lost.
+
+```{r map2, message = FALSE}
+tmap_mode("plot")
+tm_shape(scenarios) +
+  tm_polygons("net_value", title = "Net loss ($m)") +
+  tm_facets(by = "scenario", nrow = 5, ncol = 2) +
+  tm_layout(main.title = "Inundation scenarios for downtown Santa Barbara",
+            legend.position = c("right", "bottom"))
+```
+
+Just for s&g, let's do an interactive map:
+
+```{r}
+map_layer <- function(scenarios, depth) {
+  tm_shape(filter(scenarios, scenario == depth), name = sprintf("%d m", depth)) +
+    tm_fill(col = "blue", alpha = 0.5)
+}
+
+map = map_layer(scenarios, 10)
+for (i in 9:1) {
+  map = map + map_layer(scenarios, i)
+}
+
+tmap_mode("view")
+map
+```
