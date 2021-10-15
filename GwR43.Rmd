@@ -1,0 +1,100 @@
+---
+title: "EDS 223: GwR Chapter 5 Section 2"
+author: "Paloma Cartwright"
+date: "2021-10-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Prerequisites
+
+```{r}
+library(sf)
+library(terra)
+library(dplyr)
+library(spData)
+library(tmap)
+
+elev  = rast(system.file("raster/elev.tif",  package = "spData"))
+grain = rast(system.file("raster/grain.tif", package = "spData"))
+```
+
+## Spatial operations on raster data
+
+### Spatial subsetting (masking)
+
+```{r}
+rmask = elev # just to get a rmask the same shape as elev
+values(rmask) = sample(c(NA, TRUE), 36, replace = TRUE) # fill in the raster with NAs and TRUEs 
+# NAs will not be plotted 
+
+plot(elev)
+plot(rmask) # use this like a sive 
+plot(mask(elev, rmask))
+```
+
+### Map algebra
+
+### Local operations
+
+```{r}
+plot(elev)
+plot(elev + elev)
+plot(elev^2)
+plot(log(elev))
+plot(elev > 5)
+```
+
+```{r}
+plot(elev)
+
+(rcl_matrix = matrix(c(0, 12, 1, 12, 24, 2, 24, 36, 3), ncol = 3, byrow = TRUE))
+
+plot(classify(elev, rcl = rcl_matrix))
+```
+
+```{r}
+multi_raster_file = system.file("raster/landsat.tif", package = "spDataLarge")
+multi_rast = rast(multi_raster_file)
+
+plotRGB(multi_rast, r = 3, g = 2, b = 1, scale = 32767, stretch = "lin")
+```
+
+```{r}
+ndvi_fun = function(nir, red){
+  (nir - red) / (nir + red)
+}
+
+(ndvi_rast = lapp(multi_rast[[c(4, 3)]], fun = ndvi_fun))
+
+plot(ndvi_rast)
+```
+
+### Focal operations
+
+```{r}
+(neighborhood = matrix(1, nrow = 7, ncol = 7))
+
+rast_red        = multi_rast[[3]]
+rast_red_lopass = focal(rast_red, w = neighborhood, fun = mean)
+rast_red_hipass = rast_red * 2 - rast_red_lopass
+
+grayscale = gray.colors(256)
+
+plot(rast_red,        col = grayscale)
+plot(rast_red_lopass, col = grayscale)
+plot(rast_red_hipass, col = grayscale)
+```
+
+### Zonal operations
+
+```{r}
+plot(elev)
+plot(grain)
+
+zonal(elev, grain, fun = "mean")
+```
+

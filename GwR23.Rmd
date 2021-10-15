@@ -1,0 +1,50 @@
+---
+title: "EDS 223: GwR Chapter 5 Section 2"
+author: "Paloma Cartwright"
+date: "2021-10-15"
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Prerequisites
+
+```{r}
+library(terra)
+library(spDataLarge)
+library(tmap)
+```
+
+## Raster classes
+
+```{r}
+single_raster_file = system.file("raster/srtm.tif", package = "spDataLarge")
+(single_rast = rast(single_raster_file))
+# the point of having a raster is to represent something that you can't separate. (maybe) 
+```
+
+```{r}
+plot(single_rast, col = terrain.colors(255))
+
+tm_shape(single_rast) +
+  tm_raster(style = "cont", palette = terrain.colors(255))
+```
+
+```{r}
+multi_raster_file = system.file("raster/landsat.tif", package = "spDataLarge")
+(multi_rast = rast(multi_raster_file))
+```
+
+```{r}
+plot(multi_rast)
+```
+```{r}
+# when plotting a raster, you make a decision about which band you want in which color. this is totally up to you. 
+plotRGB(multi_rast, b = 1, g = 2, r = 3, scale = 32767, stretch = "lin")
+plotRGB(multi_rast, b = 2, g = 3, r = 4, scale = 32767, stretch = "lin")
+```
+

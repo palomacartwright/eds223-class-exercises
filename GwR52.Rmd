@@ -1,0 +1,85 @@
+---
+title: "EDS 223: GwR Chapter 5 Section 2"
+author: "Paloma Cartwright"
+date: "2021-10-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Prerequisites
+
+```{r}
+library(sf)
+library(dplyr)
+library(spData)
+library(spDataLarge)
+```
+
+## Geometric operations on vector data
+
+### Buffers
+
+You can measure distance between two things by: 
+
+- measure the distance from you to me 
+- expand me until you intercept with me 
+- the buffer is the distance away from an object that is like a boundary or something. 
+
+```{r}
+# this code creates a buffer around the seine
+seine_buff_5km  = st_buffer(seine, dist =  5000) # creates a buffer of 5000 
+seine_buff_50km = st_buffer(seine, dist = 50000)
+```
+
+```{r}
+# this is a way to take a look and figure out what is going on in what you're doing. 
+plot(seine,           key.pos = 1, main = NULL)
+plot(seine_buff_5km,  key.pos = 1, main = NULL)
+plot(seine_buff_50km, key.pos = 1, main = NULL)
+```
+
+### Clipping
+
+```{r}
+b <- st_sfc(st_point(c(0, 1)), st_point(c(1, 1))) %>%
+  st_buffer(dist = 1)
+
+plot(b)
+text(x = c(-0.5, 1.5), y = 1, labels = c("x", "y"))
+```
+
+```{r}
+x <- b[1] # pull out the first polygon 
+y <- b[2] # pull out the second polygon 
+
+clip_demo <- function(op) { # creating a function 
+  plot(b) # plots the two overlapping circles without the labels 
+  plot(op(x, y), col = "lightgrey", add = TRUE) # plots the result of applying the operator to the two circles 
+}
+```
+
+```{r}
+clip_demo(st_intersection)   # AND
+clip_demo(st_union)          # OR
+clip_demo(st_sym_difference) # XOR - symmetric difference 
+clip_demo(st_difference) # all in the first circle that do not overlap with the second circle
+```
+
+```{r}
+box <-
+  st_union(x, y) %>%
+  st_bbox() %>%
+  st_as_sfc()
+
+set.seed(2021)
+p <- st_sample(box, size = 20)
+
+plot(box)
+plot(x, add = TRUE)
+plot(y, add = TRUE)
+plot(p[st_difference(x, y)], add = TRUE) # only give me the features in p that satisfy the passed function
+text(x = c(-0.5, 1.5), y = 1, labels = c("x", "y"))
+```
